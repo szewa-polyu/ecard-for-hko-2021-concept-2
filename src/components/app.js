@@ -1,21 +1,12 @@
-import { h } from 'preact';
-import { Router } from 'preact-router';
+import Canvas from './canvas';
+import style from './app.css';
 
-import Header from './header';
-
-// Code-splitting is automated for `routes` directory
-import Home from '../routes/home';
-import Profile from '../routes/profile';
-
-const App = () => (
-	<div id="app">
-		<Header />
-		<Router>
-			<Home path="/" />
-			<Profile path="/profile/" user="me" />
-			<Profile path="/profile/:user" />
-		</Router>
-	</div>
-)
+const App = _ => (
+  <div className={style.App}>
+    <div className={style.ecardContainer}>
+      <Canvas />
+    </div>
+  </div>
+);
 
 export default App;
