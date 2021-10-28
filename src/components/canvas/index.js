@@ -4,7 +4,7 @@ import style from './style.css';
 
 // https://stackoverflow.com/questions/56197908/how-to-use-paperjs-with-react
 
-const { Size, Point, Raster, Path, Color } = Paper;
+const { Size, Point, Raster, Path, Color, Tween } = Paper;
 
 const canvasWidth = 550;
 const canvasHeight = 320;
@@ -47,6 +47,11 @@ const Canvas = _ => {
 
     const numOfGridX = canvasWidth / gridSize;
     const numOfGridY = canvasHeight / gridSize;
+    const totalNumOfGrids = numOfGridX * numOfGridY;
+    const layer1FadeInCounterThreshold = 0.05 * totalNumOfGrids;
+
+    const layer1FadeInTween1Duration = 2500;
+    const layer1FadeInTween2Duration = 2500;
 
     const rasterSrc = process.env.PUBLIC_PATH + 'assets/images/background.jpg';
 
@@ -58,15 +63,7 @@ const Canvas = _ => {
     // set up layer 1
     layer1Raster.size = new Size(canvasWidth, canvasHeight);
 
-    // set layer 1 alpha
-    for (let y = 0; y < layer1Raster.height; y++) {
-      for (let x = 0; x < layer1Raster.width; x++) {
-        const color = layer1Raster.getPixel(x, y);
-        const newColor = new Color(color);
-        newColor.alpha = 0;
-        layer1Raster.setPixel(x, y, newColor);
-      }
-    }
+    layer1Raster.opacity = 0;
 
     // layers 2 and 3
     const layer2And3Raster = await loadRasterAsync(rasterSrc, raster => {
@@ -106,7 +103,7 @@ const Canvas = _ => {
         const layer3Path = new Path.Circle({
           center: new Point(x * gridSize, y * gridSize),
           radius: gridSize / 2 / spacing,
-          fillColor: 'black'
+          fillColor: new Color(0, 0, 0, 1)
         });
 
         // Scale the path by the amount of gray in the pixel color:
@@ -115,7 +112,7 @@ const Canvas = _ => {
         layer2And3Paths.push({
           layer2: layer2Path,
           layer3: layer3Path,
-          currentLayer: 3
+          isFlipped: false
         });
       }
     }
@@ -124,7 +121,52 @@ const Canvas = _ => {
     // the created paths in it appear centered.
     project.activeLayer.position = view.center;
 
-    view.onMouseMove = event => {
+    let isLayer1FadedIn = false;
+
+    const fadeInLayer1 = _ => {
+      isLayer1FadedIn = true;
+      console.log('fade in!');
+
+      // dummy layer2And3Raster
+      const tween1 = layer2And3Raster.tween(
+        { myValue: 0 },
+        { myValue: 1 },
+        {
+          duration: layer1FadeInTween1Duration,
+          easing: 'easeOutCubic'
+        }
+      );
+
+      tween1.on('update', ({ factor }) => {
+        for (let layer2And3Path of layer2And3Paths) {
+          layer2And3Path.layer3.fillColor.alpha = 1 - factor;
+          layer2And3Path.layer2.fillColor.alpha = 0.5 + 0.5 * factor;
+        }
+      });
+
+      tween1.then(_ => {
+        // dummy layer2And3Raster
+        const tween2 = layer2And3Raster.tween(
+          { myValue: 0 },
+          { myValue: 1 },
+          {
+            duration: layer1FadeInTween2Duration,
+            easing: 'easeOutCubic'
+          }
+        );
+
+        tween2.on('update', ({ factor }) => {
+          for (let layer2And3Path of layer2And3Paths) {
+            layer2And3Path.layer2.fillColor.alpha = 1 - factor;
+          }
+          layer1Raster.opacity = factor;
+        });
+      });
+    };
+
+    let layer2And3FlippedCounter = 0;
+
+    const handleMouseMove = event => {
       const { x, y } = event.point;
       let gridX = Math.round(x / gridSize);
       let gridY = Math.round(y / gridSize);
@@ -144,28 +186,35 @@ const Canvas = _ => {
       if (layer2And3Path === undefined) {
         console.log('Exception: ', gridX, gridY);
       } else {
-        switch (layer2And3Path.currentLayer) {
-          case 3:
-            layer2And3Path.layer3.fillColor.alpha = 0;
-            layer2And3Path.layer2.fillColor.alpha = 1;
-            layer2And3Path.currentLayer = 2;
-            break;
-          case 2:
-            // layer2And3Path.layer2.fillColor.alpha = 0;
-            // layer2And3Path.currentLayer = 1;
+        if (!layer2And3Path.isFlipped) {
+          layer2And3Path.layer3.fillColor.alpha = 0;
+          layer2And3Path.layer2.fillColor.alpha = 1;
+          layer2And3Path.isFlipped = true;
 
-            // // set layer 1
-            // const color = layer1Raster.getPixel(x, y);
-            // const newColor = new Color(color);
-            // newColor.alpha = 1;
-            // layer1Raster.setPixel(x, y, newColor);
+          layer2And3FlippedCounter++;
 
-            break;
+          console.log(
+            'fill progress: ',
+            Math.ceil(
+              (layer2And3FlippedCounter / layer1FadeInCounterThreshold) * 100
+            ),
+            '%'
+          );
+
+          if (
+            !isLayer1FadedIn &&
+            layer2And3FlippedCounter > layer1FadeInCounterThreshold
+          ) {
+            view.off('mousemove', handleMouseMove);
+            fadeInLayer1();
+          }
         }
       }
     };
 
-    view.draw();
+    view.on('mousemove', handleMouseMove);
+
+    view.onMouseMove = view.draw();
   }, []);
 
   useEffect(
@@ -187,10 +236,6 @@ const Canvas = _ => {
   return (
     <div className={style.canvasContainer}>
       <canvas ref={canvasRef} className={style.ecardCanvas} />
-      <button
-        className={`button reset ${isShowResetButton ? 'show' : 'hide'}`}
-        onClick={handleResetButtonClick}
-      />
       <audio ref={audioRef} src={''} loop={true} />
     </div>
   );
