@@ -24,10 +24,29 @@
   /* background-image: linear-gradient(315deg, #abe9cd 0%, #3eadcf 74%); */
 }
 
-.canvasContainer .ecardCanvas.show {
-  opacity: 1;
-}
+/* https://css-tricks.com/making-pure-css-playpause-button/ */
+.canvasContainer .startButton {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 
-.canvasContainer .ecardCanvas.hide {
-  opacity: 0.4;
+  border-radius: 10px;
+  font-size: smaller;
+
+  /* width: 74px;
+  height: 74px;
+  border-style: solid;
+  border-width: 37px;
+  border-color: var(--xmas-green);
+
+  background-color: var(--xmas-red);
+
+  border-width: 37px 0px 37px 74px;
+  border-color: var(--xmas-red) var(--xmas-red) var(--xmas-red)
+    var(--xmas-green); */
+
+  cursor: pointer;
+
+  transition: var(--transition-default);
 }
