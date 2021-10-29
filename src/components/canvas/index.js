@@ -51,12 +51,14 @@ const rasterSrc = process.env.PUBLIC_PATH + 'assets/images/background.jpg';
 
 // button text
 let buttonText = 'Turn volume on & play on the canvas!';
-const pathname = window.location.pathname;
-if (pathname.includes('index_tc.html')) {
-  buttonText = '打開音量並在畫布上遊玩！';
-}
-if (pathname.includes('index_sc.html')) {
-  buttonText = '打开音量并在画布上游玩！';
+if (typeof window !== 'undefined') {
+  const pathname = window.location.pathname;
+  if (pathname.includes('index_tc.html')) {
+    buttonText = '打開音量並在畫布上遊玩！';
+  }
+  if (pathname.includes('index_sc.html')) {
+    buttonText = '打开音量并在画布上游玩！';
+  }
 }
 
 // styles
