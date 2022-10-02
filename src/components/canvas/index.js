@@ -1,11 +1,12 @@
 import { useRef, useEffect, useState, useCallback } from 'preact/hooks';
 import Paper from 'paper';
+import detectMobileBrowser from '../../utils/detectMobileBrowser';
 import style from './style.css';
 
 // https://stackoverflow.com/questions/56197908/how-to-use-paperjs-with-react
 // http://paperjs.org/tutorials/images/using-pixel-colors/
 
-const { Size, Point, Raster, Path, Color } = Paper;
+const { Size, Point, Raster, Path, Color, PointText } = Paper;
 
 /* utils */
 
@@ -29,48 +30,50 @@ const loadRasterAsync = (src, onBeforeLoad = null) =>
 
 /* constants */
 
+const isMobileBrowser = detectMobileBrowser();
+
 // canvas size
-const canvasWidth = 550;
-const canvasHeight = 320;
+let canvasWidth = 550;
+let canvasHeight = 320;
 
 // The size of our grid cells:
-const gridSize = 10;
+let gridSize = 10;
 
 // Space the cells by 120%:
-const spacing = 1.2;
+let spacing = 1.2;
 
-const numOfGridX = canvasWidth / gridSize;
-const numOfGridY = canvasHeight / gridSize;
-const totalNumOfGrids = numOfGridX * numOfGridY;
-const layer1FadeInCounterThreshold = 0.05 * totalNumOfGrids;
+let numOfGridX = canvasWidth / gridSize;
+let numOfGridY = canvasHeight / gridSize;
+let totalNumOfGrids = numOfGridX * numOfGridY;
+let layer1FadeInCounterThreshold = isMobileBrowser
+  ? 20
+  : 0.05 * totalNumOfGrids;
 
 const layer1FadeInTween1Duration = 2500;
 const layer1FadeInTween2Duration = 2500;
 
 const rasterSrc = process.env.PUBLIC_PATH + 'assets/images/background.jpg';
 
-// button text
-let buttonText = 'Turn volume on & play on the canvas!';
+// texts
+let texts = {
+  startButtonText: 'Turn sound on & play on the canvas!',
+  greetingText: "Season's Greetings!"
+};
 if (typeof window !== 'undefined') {
   const pathname = window.location.pathname;
   if (pathname.includes('index_tc.html')) {
-    buttonText = '打開音量並在畫布上遊玩！';
+    texts = {
+      startButtonText: '打開音量並在畫布上遊玩！',
+      greetingText: '節日快樂'
+    };
   }
   if (pathname.includes('index_sc.html')) {
-    buttonText = '打开音量并在画布上游玩！';
+    texts = {
+      startButtonText: '打开音量并在画布上游玩！',
+      greetingText: '节日快乐'
+    };
   }
 }
-
-// styles
-const hideStyle = {
-  opacity: 0,
-  visibility: 'hidden'
-};
-
-const showStyle = {
-  opacity: 1,
-  visibility: 'visible'
-};
 
 /* end of constants */
 
@@ -84,11 +87,33 @@ const Canvas = _ => {
   const layer2And3FlippedCounter = useRef(0);
   const isLayer1FadedIn = useRef(false);
 
+  const greetingTextRef = useRef(null);
+
   const [isStarted, setIsStarted] = useState(false);
+  const [isShowStopButton, setIsShowStopButton] = useState(false);
 
   useEffect(async _ => {
     Paper.setup(canvasRef.current);
-    const { view, project } = Paper;
+    const { view } = Paper;
+
+    const { width: viewWidth, height: viewHeight } = Paper.view.size;
+
+    // canvas size
+    canvasWidth = viewWidth;
+    canvasHeight = viewHeight;
+
+    // The size of our grid cells:
+    gridSize = (10 / 550) * canvasWidth;
+
+    // Space the cells by 120%:
+    spacing = 1.2;
+
+    numOfGridX = canvasWidth / gridSize;
+    numOfGridY = canvasHeight / gridSize;
+    totalNumOfGrids = numOfGridX * numOfGridY;
+    layer1FadeInCounterThreshold = isMobileBrowser
+      ? 20
+      : 0.05 * totalNumOfGrids;
 
     /* setting up layers */
 
@@ -154,30 +179,81 @@ const Canvas = _ => {
       }
     }
 
-    // Move the active layer to the center of the view, so all
-    // the created paths in it appear centered.
-    project.activeLayer.position = view.center;
-
     /* end of setting up layers */
 
-    /* initiating refs */
+    /* setting texts */
 
-    setIsStarted(false);
-    layer2And3FlippedCounter.current = 0;
-    isLayer1FadedIn.current = false;
+    const greetingPointText = new PointText(view.center);
+    greetingPointText.content = texts.greetingText;
+    greetingPointText.opacity = 0;
+    greetingPointText.fontSize = (36 * view.size.width) / canvasWidth;
+    greetingPointText.position = new Point(view.center.x, view.center.y * 0.65);
+    greetingPointText.fillColor = new Color(1, 0, 0);
+    greetingTextRef.current = greetingPointText;
 
-    /* end of initiating refs */
+    /* end of setting texts */
+
+    reset();
 
     view.draw();
   }, []);
 
   /* functions and event handlers */
 
+  const reset = useCallback(_ => {
+    const { view, project } = Paper;
+
+    /* setting up layers */
+
+    // set up layer 1
+    layer1Raster.current.opacity = 0;
+
+    // set up layers 2 & 3
+    for (let layer2And3Path of layer2And3Paths.current) {
+      layer2And3Path.layer2.fillColor.alpha = 0;
+      layer2And3Path.layer3.fillColor.alpha = 1;
+      layer2And3Path.isFlipped = false;
+    }
+
+    /* end of setting up layers */
+
+    /* setting up audio */
+
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+
+    /* end of setting up audio */
+
+    /* setting up texts */
+
+    greetingTextRef.current.opacity = 0;
+
+    /* end of setting up texts */
+
+    /* initiating refs */
+
+    setIsStarted(false);
+    setIsShowStopButton(false);
+    layer2And3FlippedCounter.current = 0;
+    isLayer1FadedIn.current = false;
+
+    /* end of initiating refs */
+
+    // Move the active layer to the center of the view, so all
+    // the created paths in it appear centered.
+    project.activeLayer.position = view.center;
+  }, []);
+
   const fadeInLayer1 = useCallback(_ => {
     isLayer1FadedIn.current = true;
     console.log('fade in!');
     audioRef.current.volume = 0;
     audioRef.current.play();
+
+    const layer2And3PathsCurrent = layer2And3Paths.current;
+    for (let layer2And3Path of layer2And3PathsCurrent) {
+      layer2And3Path.layer3.fillColor.alpha = 0;
+    }
 
     // dummy layer2And3Raster
     const tween1 = layer2And3Raster.current.tween(
@@ -190,10 +266,10 @@ const Canvas = _ => {
     );
 
     tween1.on('update', ({ factor }) => {
-      const layer2And3PathsCurrent = layer2And3Paths.current;
       for (let layer2And3Path of layer2And3PathsCurrent) {
-        layer2And3Path.layer3.fillColor.alpha = 1 - factor;
-        layer2And3Path.layer2.fillColor.alpha = 0.5 + 0.5 * factor;
+        if (!layer2And3Path.isFlipped) {
+          layer2And3Path.layer2.fillColor.alpha = 0.5 + 0.5 * factor;
+        }
       }
       audioRef.current.volume = 0.5 * factor;
     });
@@ -215,7 +291,12 @@ const Canvas = _ => {
           layer2And3Path.layer2.fillColor.alpha = 1 - factor;
         }
         layer1Raster.current.opacity = factor;
+        greetingTextRef.current.opacity = factor;
         audioRef.current.volume = 0.5 + 0.5 * factor;
+      });
+
+      tween2.then(_ => {
+        setIsShowStopButton(true);
       });
     });
   }, []);
@@ -289,18 +370,29 @@ const Canvas = _ => {
     setIsStarted(true);
   }, []);
 
+  const handleStopButtonClick = useCallback(_ => {
+    reset();
+  }, []);
+
   /* end of functions and event handlers */
 
   return (
     <div className={style.canvasContainer}>
       <canvas ref={canvasRef} className={style.ecardCanvas} />
       <button
-        className={style.startButton}
+        className={`${style.startButton} ${
+          isStarted ? style.hide : style.show
+        }`}
         onClick={handleStartButtonClick}
-        style={isStarted ? hideStyle : showStyle}
       >
-        {buttonText}
+        {texts.startButtonText}
       </button>
+      <button
+        className={`${style.button} ${style.stopButton} ${
+          isShowStopButton ? style.show : style.hide
+        }`}
+        onClick={handleStopButtonClick}
+      />
       <audio
         ref={audioRef}
         src={process.env.PUBLIC_PATH + 'assets/audio/bgm.mp3'}

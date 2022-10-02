@@ -1,9 +1,26 @@
 .App {
+  --canvas-max-width-val: 550;
+  --canvas-width: 550px;
+  --canvas-height: 320px;
+
+  --transition-time-default: 0.4s;
+  --transition-default: all var(--transition-time-default);
+
+  --xmas-green: rgb(0, 135, 62);
+  --xmas-red: rgb(228, 10, 45);
+
   text-align: center;
 }
 
+@media screen and (max-width: 549px) {
+  .App {
+    --canvas-width: 100vw;
+  }
+}
+
 .ecardContainer {
-  background-color: #282c34;
+  /* background-color: #282c34; */
+  background-color: #ffffff;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
